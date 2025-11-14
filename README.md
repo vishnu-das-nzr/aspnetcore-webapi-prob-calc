@@ -3,6 +3,7 @@
 A simple and modular ASP.NET Core Web API for calculating basic probability operations.
 
 🚀 Endpoints
+
 1️⃣ Combined Probability
 
 POST /api/probabilities/combinedwith
@@ -60,6 +61,7 @@ dotnet restore
 dotnet run --project ProbCalculation.API
 
 Swagger available at:
+
 https://localhost:7001/swagger
 
 📄 Tech Stack
