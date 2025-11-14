@@ -1,4 +1,0 @@
-[2025-11-14 17:52:50.022 UTC] | Op: CombinedWith | Details: { Input: [ P(A)=0.0000, P(B)=0.0000 ] , Result: [ 0.0000 ] }
-[2025-11-14 17:53:19.772 UTC] | Op: CombinedWith | Details: { Input: [ P(A)=0.5000, P(B)=0.5000 ] , Result: [ 0.2500 ] }
-[2025-11-14 18:20:22.514 UTC] | Op: CombinedWith | Details: { Input: [ P(A)=0.5000, P(B)=0.5000 ] , Result: [ 0.2500 ] }
-[2025-11-14 18:20:36.726 UTC] | Op: Either | Details: { Input: [ P(A)=0.5000, P(B)=0.5000 ] , Result: [ 0.7500 ] }
