@@ -43,7 +43,6 @@ artifacts/
 
 # Dotnet Core
 project.assets.json
-appsettings*.json
 # If you use user secrets
 secrets.json
 
