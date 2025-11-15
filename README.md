@@ -39,6 +39,10 @@ Response
   "result": 0.75
 }
 
+Activity logs.
+
+The activity log file, probability_activity.txt, can be found inside the ProbCalculation.API/ActivityLogs directory in the source code.
+
 🧱 Project Structure (Essential)
 
 ProbCalculation.API                 # API controllers
