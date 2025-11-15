@@ -9,92 +9,143 @@ namespace Common.Logging.Service.Tests
 {
     public class ActivityLoggerServiceTests : IDisposable
     {
-        private readonly List<string> _filesToCleanup = new();
+        private readonly string _testLogFile;
+
+        public ActivityLoggerServiceTests()
+        {
+            // Setup: Create a unique test file path
+            _testLogFile = Path.Combine(Path.GetTempPath(), $"test_log_{Guid.NewGuid()}.txt");
+        }
 
         public void Dispose()
         {
-            foreach (var f in _filesToCleanup)
+            // Cleanup: Delete test file after each test
+            if (File.Exists(_testLogFile))
             {
-                try
-                {
-                    if (File.Exists(f)) File.Delete(f);
-                }
-                catch { /* best-effort cleanup */ }
+                File.Delete(_testLogFile);
             }
         }
 
-        [Fact]
-        public async Task LogActivityAsync_WithConfiguredAbsolutePath_WritesExpectedLogEntry()
+        private IConfiguration CreateTestConfiguration(string logPath)
         {
-            // Arrange - create temp folder and file path
-            var tempDir = Path.Combine(Path.GetTempPath(), "ActivityLoggerTests", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-            var logFile = Path.Combine(tempDir, "my_probability_activity.txt");
-            _filesToCleanup.Add(logFile);
-
-            // Build configuration with the absolute path
-            var inMemory = new Dictionary<string, string?>
+            var config = new Dictionary<string, string>
             {
-                ["ActivityLogging:ProbabilityLogFilePath"] = logFile
+                { "ActivityLogging:ProbabilityLogFilePath", logPath }
             };
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(inMemory)
+
+            return new ConfigurationBuilder()
+                .AddInMemoryCollection(config)
                 .Build();
-
-            var service = new ActivityLoggerService(configuration);
-
-            var operation = "CombinedWith";
-            var details = "Input: { P(A)=0.5, P(B)=0.5 } , Result: { 0.2500 }";
-
-            // Act
-            await service.LogActivityAsync(operation, details);
-
-            // Assert - file exists and contains expected information
-            Assert.True(File.Exists(logFile), "Expected log file to be created at configured location.");
-
-            var contents = await File.ReadAllTextAsync(logFile);
-            Assert.Contains(operation, contents);
-            Assert.Contains(details, contents);
-
-            // basic timestamp pattern check (UTC with milliseconds)
-            Assert.Matches(@"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC\]", contents);
         }
 
         [Fact]
-        public async Task LogActivityAsync_WhenConfigMissing_UsesFallbackPathInAppBaseDirectory()
+        public async Task LogActivityAsync_CreatesFileAndWritesLog()
         {
-            // Arrange - no configuration key provided
-            var inMemory = new Dictionary<string, string?>();
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(inMemory)
-                .Build();
+            // Arrange
+            var config = CreateTestConfiguration(_testLogFile);
+            var logger = new ActivityLoggerService(config);
 
-            // compute expected fallback path (must match implementation)
+            // Act
+            await logger.LogActivityAsync("CombinedWith", "P(A)=0.5, P(B)=0.3, Result=0.15");
+
+            // Assert
+            Assert.True(File.Exists(_testLogFile));
+            var content = await File.ReadAllTextAsync(_testLogFile);
+            Assert.Contains("CombinedWith", content);
+            Assert.Contains("P(A)=0.5", content);
+            Assert.Contains("Result=0.15", content);
+        }
+
+        [Fact]
+        public async Task LogActivityAsync_AppendsMultipleLogs()
+        {
+            // Arrange
+            var config = CreateTestConfiguration(_testLogFile);
+            var logger = new ActivityLoggerService(config);
+
+            // Act
+            await logger.LogActivityAsync("CombinedWith", "Entry 1");
+            await logger.LogActivityAsync("Either", "Entry 2");
+
+            // Assert
+            var content = await File.ReadAllTextAsync(_testLogFile);
+            Assert.Contains("Entry 1", content);
+            Assert.Contains("Entry 2", content);
+        }
+
+        [Fact]
+        public async Task LogActivityAsync_IncludesTimestamp()
+        {
+            // Arrange
+            var config = CreateTestConfiguration(_testLogFile);
+            var logger = new ActivityLoggerService(config);
+
+            // Act
+            await logger.LogActivityAsync("Either", "Test");
+
+            // Assert
+            var content = await File.ReadAllTextAsync(_testLogFile);
+            Assert.Matches(@"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC\]", content);
+        }
+
+        [Fact]
+        public async Task LogActivityAsync_HasCorrectFormat()
+        {
+            // Arrange
+            var config = CreateTestConfiguration(_testLogFile);
+            var logger = new ActivityLoggerService(config);
+
+            // Act
+            await logger.LogActivityAsync("TestOp", "TestDetails");
+
+            // Assert
+            var content = await File.ReadAllTextAsync(_testLogFile);
+            Assert.Contains("Op: TestOp", content);
+            Assert.Contains("Details: TestDetails", content);
+        }
+
+        [Fact]
+        public void Constructor_UsesFallbackPath_WhenConfigEmpty()
+        {
+            // Arrange
+            var config = CreateTestConfiguration("");
             var fallbackPath = Path.Combine(AppContext.BaseDirectory, "probability_activity.txt");
 
-            // ensure we clean up fallback file after test
-            _filesToCleanup.Add(fallbackPath);
+            // Act
+            var logger = new ActivityLoggerService(config);
+            logger.LogActivityAsync("Test", "Data").Wait();
 
-            // Remove existing fallback file if present (clean start)
+            // Assert
+            Assert.True(File.Exists(fallbackPath));
+
+            // Cleanup
             if (File.Exists(fallbackPath))
             {
                 File.Delete(fallbackPath);
             }
+        }
 
-            var service = new ActivityLoggerService(configuration);
-
-            var operation = "Either";
-            var details = "Input: { P(A)=0.2, P(B)=0.3 } , Result: { 0.4400 }";
+        [Fact]
+        public void Constructor_CreatesDirectory_WhenNotExists()
+        {
+            // Arrange
+            var newDir = Path.Combine(Path.GetTempPath(), $"test_dir_{Guid.NewGuid()}");
+            var logPath = Path.Combine(newDir, "log.txt");
+            var config = CreateTestConfiguration(logPath);
 
             // Act
-            await service.LogActivityAsync(operation, details);
+            var logger = new ActivityLoggerService(config);
+            logger.LogActivityAsync("Test", "Data").Wait();
 
             // Assert
-            Assert.True(File.Exists(fallbackPath), "Expected fallback log file to be created in AppContext.BaseDirectory.");
+            Assert.True(Directory.Exists(newDir));
+            Assert.True(File.Exists(logPath));
 
-            var contents = await File.ReadAllTextAsync(fallbackPath);
-            Assert.Contains(operation, contents);
-            Assert.Contains(details, contents);
+            // Cleanup
+            if (Directory.Exists(newDir))
+            {
+                Directory.Delete(newDir, true);
+            }
         }
     }
 }

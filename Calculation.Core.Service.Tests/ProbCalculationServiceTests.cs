@@ -7,76 +7,60 @@ namespace Calculation.Core.Service.Tests
     public class ProbCalculationServiceTests
     {
         [Fact]
-        public async Task CombinedWithAsync_ComputesProduct_And_Logs()
+        public async Task CombinedWithAsync_ReturnsProduct_And_Logs()
         {
             // Arrange
-            var loggerMock = new Mock<IActivityLoggerService>(MockBehavior.Strict);
-            // Setup expectation: called once with operation "CombinedWith" and a message containing formatted values
-            loggerMock
-                .Setup(l => l.LogActivityAsync(
-                    It.Is<string>(op => op == "CombinedWith"),
-                    It.Is<string>(msg => msg.Contains("P(A)=0.5000") && msg.Contains("P(B)=0.5000") && msg.Contains("0.2500"))))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
+            var mockLogger = new Mock<IActivityLoggerService>();
+            mockLogger
+                .Setup(l => l.LogActivityAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
 
-            var svc = new ProbCalculationService(loggerMock.Object);
+            var service = new ProbCalculationService(mockLogger.Object);
+
+            double pA = 0.5;
+            double pB = 0.2;
+            double expectedResult = pA * pB;
+            // Build expected log text exactly as the service does (ToString("F4"))
+            string expectedLog = $"{{ Input: [ P(A)={pA.ToString("F4")}, P(B)={pB.ToString("F4")} ] , Result: [ {expectedResult.ToString("F4")} ] }}";
 
             // Act
-            var result = await svc.CombinedWithAsync(0.5, 0.5);
+            var result = await service.CombinedWithAsync(pA, pB);
 
-            // Assert
-            Assert.Equal(0.25, result, 6);
-            loggerMock.Verify(l => l.LogActivityAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-            loggerMock.Verify(); // ensures the specific Setup expectation was met
+            // Assert result
+            Assert.Equal(expectedResult, result, precision: 10);
+
+            // Assert logger called with correct operation name and details
+            mockLogger.Verify(
+                l => l.LogActivityAsync("CombinedWith", expectedLog),
+                Times.Once);
         }
 
         [Fact]
-        public async Task EitherAsync_ComputesUnion_And_Logs()
+        public async Task EitherAsync_ReturnsUnion_And_Logs()
         {
             // Arrange
-            var loggerMock = new Mock<IActivityLoggerService>(MockBehavior.Strict);
-            // For pA=0.5, pB=0.5 result is 0.75 -> 0.7500 formatted
-            loggerMock
-                .Setup(l => l.LogActivityAsync(
-                    It.Is<string>(op => op == "Either"),
-                    It.Is<string>(msg => msg.Contains("P(A)=0.5000") && msg.Contains("P(B)=0.5000") && msg.Contains("0.7500"))))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
-
-            var svc = new ProbCalculationService(loggerMock.Object);
-
-            // Act
-            var result = await svc.EitherAsync(0.5, 0.5);
-
-            // Assert
-            Assert.Equal(0.75, result, 6);
-            loggerMock.Verify(l => l.LogActivityAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-            loggerMock.Verify();
-        }
-
-        [Theory]
-        [InlineData(0.1234, 0.8766, 0.1082)] // combined: 0.1234*0.8766=0.10820044 -> 0.1082
-        [InlineData(0.0, 1.0, 0.0)]
-        public async Task CombinedWithAsync_FormatsResultToFourDecimals_InLog(double a, double b, double expected)
-        {
-            // Arrange
-            var loggerMock = new Mock<IActivityLoggerService>();
-            loggerMock
-                .Setup(l => l.LogActivityAsync(
-                    "CombinedWith",
-                    It.Is<string>(s => s.Contains(expected.ToString("F4")))))
+            var mockLogger = new Mock<IActivityLoggerService>();
+            mockLogger
+                .Setup(l => l.LogActivityAsync(It.IsAny<string>(), It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
 
-            var svc = new ProbCalculationService(loggerMock.Object);
+            var service = new ProbCalculationService(mockLogger.Object);
+
+            double pA = 0.5;
+            double pB = 0.3;
+            double expectedResult = pA + pB - pA * pB;
+            string expectedLog = $"{{ Input: [ P(A)={pA.ToString("F4")}, P(B)={pB.ToString("F4")} ] , Result: [ {expectedResult.ToString("F4")} ] }}";
 
             // Act
-            var result = await svc.CombinedWithAsync(a, b);
+            var result = await service.EitherAsync(pA, pB);
 
-            // Assert numeric result (precision tolerance)
-            Assert.Equal(a * b, result, 6);
+            // Assert result
+            Assert.Equal(expectedResult, result, precision: 10);
 
-            // Verify logger called
-            loggerMock.Verify(l => l.LogActivityAsync("CombinedWith", It.IsAny<string>()), Times.Once);
+            // Assert logger called with correct operation name and details
+            mockLogger.Verify(
+                l => l.LogActivityAsync("Either", expectedLog),
+                Times.Once);
         }
     }
 }
