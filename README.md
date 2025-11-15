@@ -42,6 +42,7 @@ Response
 Activity logs.
 
 The activity log file, probability_activity.txt, can be found inside the ProbCalculation.API/ActivityLogs directory in the source code.
+The file name and path are configured through the appsettings.json file.
 
 🧱 Project Structure (Essential)
 
